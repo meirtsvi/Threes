@@ -4,6 +4,8 @@ using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
+    public GameObject squarePrefab;
+    
     private const int WIDTH = 4;
     private const int HEIGHT = 4;
 
@@ -18,14 +20,23 @@ public class GameManager : MonoBehaviour
         Right
     }
 
-    int[,] Board = new int[HEIGHT, WIDTH];
-    GameObject[,] ObjectBoard = new GameObject[HEIGHT, WIDTH];
+    private int[,] Board = new int[HEIGHT, WIDTH];
+    private GameObject[,] ObjectBoard = new GameObject[HEIGHT, WIDTH];
 
-    public GameObject squarePrefab;
+    private GameObject next_box;
+    private int next_value;
+
     private Material red_color, blue_color, white_color;
+
+    private Canvas canvas;
+    RectTransform canvas_rt;
 
     void Start()
     {
+        GameObject canvas_container = GameObject.Find("Canvas");
+        canvas = canvas_container.GetComponent<Canvas>();
+        canvas_rt = (RectTransform)squarePrefab.transform;
+
         for (int y=0; y<HEIGHT; y++)
         {
             for (int x=0; x<WIDTH; x++)
@@ -36,10 +47,28 @@ public class GameManager : MonoBehaviour
         red_color = Resources.Load<Material>("Materials/RedMaterial");
         blue_color = Resources.Load<Material>("Materials/BlueMaterial");
         white_color = Resources.Load<Material>("Materials/WhiteMaterial");
+        
         CreateBoard();
         SetInitialBoard();
         UpdateBoard();
-   
+
+        CreateNextBox();
+        GenerateNextValue();
+    }
+
+    private void CreateNextBox()
+    {
+        GameObject newSquare = Instantiate(squarePrefab, new Vector3(0, 0, 0), Quaternion.identity, canvas.transform);
+        newSquare.transform.localPosition = new Vector3(100, -50, 0);
+        Text text_object = newSquare.transform.Find("Text").GetComponent<Text>();
+        text_object.transform.localPosition = new Vector3(-0.5f, -0.5f, 0);
+        next_box = newSquare;
+    }
+
+    private void GenerateNextValue()
+    {
+        next_value = UnityEngine.Random.Range(1, 4);
+        render_cell(next_box, next_value);
     }
 
     void Update()
@@ -68,6 +97,7 @@ public class GameManager : MonoBehaviour
             Debug.Log(String.Format("Going {0} is possible", direction.ToString()));
             ApplyMove(direction, res);
             AddNewNumber(direction);
+            GenerateNextValue();
         }
     }
 
@@ -82,28 +112,28 @@ public class GameManager : MonoBehaviour
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[HEIGHT - 1, random] = 3;
+                Board[HEIGHT - 1, random] = next_value;
                 break;
             case Direction.Down:
                 while (Board[0, random] != 0)
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[0, random] = 3;
+                Board[0, random] = next_value;
                 break;
             case Direction.Left:
                 while (Board[random, WIDTH-1] != 0)
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[random, WIDTH-1] = 3;
+                Board[random, WIDTH-1] = next_value;
                 break;
             case Direction.Right:
                 while (Board[random, 0] != 0)
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[random, 0] = 3;
+                Board[random, 0] = next_value;
                 break;
         }
         UpdateBoard();
@@ -243,12 +273,6 @@ public class GameManager : MonoBehaviour
             } while (Board[y, x] != 0);
             Board[y, x] = 2;
         }
-
-        Board[3, 0] = 24;
-        Board[3, 1] = 12;
-        Board[3, 2] = 3;
-        Board[3, 3] = 3;
-
     }
 
     private void UpdateBoard()
@@ -259,47 +283,49 @@ public class GameManager : MonoBehaviour
             {
                 GameObject curr_cell = ObjectBoard[y, x];
                 int number = Board[y, x];
-                Text text_object = curr_cell.transform.Find("Text").GetComponent<Text>();
-                text_object.text = number.ToString();
-
-                Material color;
-                switch (number)
-                {
-                    case 0:
-                        color = white_color;
-                        text_object.text = "";
-                        break;
-                    case 1:
-                        color = red_color;
-                        text_object.color = Color.white;
-                        break;
-                    case 2:
-                        color = blue_color;
-                        text_object.color = Color.white;
-                        break;
-                    default:
-                        color = white_color;
-                        text_object.color = Color.red;
-                        break;
-                }
-                curr_cell.GetComponent<Image>().material = color;
-
+                render_cell(curr_cell, number);
             }
         }
     }
+
+    private void render_cell(GameObject cell, int value)
+    {
+        Text text_object = cell.transform.Find("Text").GetComponent<Text>();
+        text_object.text = value.ToString();
+
+        Material color;
+        switch (value)
+        {
+            case 0:
+                color = white_color;
+                text_object.text = "";
+                break;
+            case 1:
+                color = red_color;
+                text_object.color = Color.white;
+                break;
+            case 2:
+                color = blue_color;
+                text_object.color = Color.white;
+                break;
+            default:
+                color = white_color;
+                text_object.color = Color.red;
+                break;
+        }
+        cell.GetComponent<Image>().material = color;
+    }
+
     private void DrawCell(int x, int y)
     {
-        GameObject canvas_container = GameObject.Find("Canvas");
-        Canvas canvas = canvas_container.GetComponent<Canvas>();
-        RectTransform rt = (RectTransform)squarePrefab.transform;
-
-        float squareWidth = rt.rect.width;
-        float squareHeight = rt.rect.height;
+        float squareWidth = canvas_rt.rect.width;
+        float squareHeight = canvas_rt.rect.height;
         float zero_x = ((-1) * canvas.pixelRect.width / 2) + (squareWidth / 2);
         float zero_y = ((-1) * canvas.pixelRect.height / 2) + (squareHeight / 2);
-
+        float x_pos = zero_x + squareWidth * x;
+        float y_pos = zero_y + squareHeight * y;
         GameObject newSquare = Instantiate(squarePrefab, new Vector3(0, 0, 0), Quaternion.identity, canvas.transform);
-        newSquare.transform.localPosition = new Vector3(zero_x + squareWidth*x, zero_y +squareHeight*y, 0);
+        newSquare.transform.localPosition = new Vector3(x_pos, y_pos, 0);
         Text text_object = newSquare.transform.Find("Text").GetComponent<Text>();
         text_object.transform.localPosition = new Vector3(-0.5f, -0.5f, 0);
         ObjectBoard[y, x] = newSquare;
