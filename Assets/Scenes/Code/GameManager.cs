@@ -344,14 +344,6 @@ public class GameManager : MonoBehaviour
         else
             text_object.text = String.Join(",", nextValues);
 
-        for (int i=0; i<nextValues.Count; i++)
-        {
-            if (nextValues[i] == 307 || nextValues[i] == 7 || nextValues[i] > 40)
-            {
-                int r = 1;
-            }
-        }
-
         Material color;
         switch (nextValues[0])
         {

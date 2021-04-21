@@ -81,7 +81,7 @@ public class NextValueManager
 		else
 		{
 			int rank = GetRank(futureValue);
-			int num = Mathf.Min(rank - 1, 3);
+			int num = Math.Min(rank - 1, 3);
 
 			for (int i = 0; i < 3; i++)
 			{
@@ -92,13 +92,6 @@ public class NextValueManager
 			}
 		}
 
-		for (int i=0; i<ret.Count; i++)
-        {
-			if (ret[i] > 3 && ret[i] % 3 != 0)
-            {
-				int r = 1;
-            }
-        }
 		return ret;
 	}
 
