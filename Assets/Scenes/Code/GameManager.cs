@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -23,16 +24,21 @@ public class GameManager : MonoBehaviour
     private int[,] Board = new int[HEIGHT, WIDTH];
     private GameObject[,] ObjectBoard = new GameObject[HEIGHT, WIDTH];
 
-    private GameObject next_box;
-    private int next_value;
+    int numMoves;
+    private GameObject nextBox;
+    NextValueManager nvm;
+    List<int> nextValues;
 
     private Material red_color, blue_color, white_color;
 
     private Canvas canvas;
     RectTransform canvas_rt;
 
+
     void Start()
     {
+        numMoves = 0;
+        nvm = new NextValueManager();
         GameObject canvas_container = GameObject.Find("Canvas");
         canvas = canvas_container.GetComponent<Canvas>();
         canvas_rt = (RectTransform)squarePrefab.transform;
@@ -53,7 +59,7 @@ public class GameManager : MonoBehaviour
         UpdateBoard();
 
         CreateNextBox();
-        GenerateNextValue();
+        nextValues = GenerateNextValue();
     }
 
     private void CreateNextBox()
@@ -62,13 +68,25 @@ public class GameManager : MonoBehaviour
         newSquare.transform.localPosition = new Vector3(100, -50, 0);
         Text text_object = newSquare.transform.Find("Text").GetComponent<Text>();
         text_object.transform.localPosition = new Vector3(-0.5f, -0.5f, 0);
-        next_box = newSquare;
+        nextBox = newSquare;
     }
 
-    private void GenerateNextValue()
+    private List<int> GenerateNextValue()
     {
-        next_value = UnityEngine.Random.Range(1, 4);
-        render_cell(next_box, next_value);
+        int highestRank = NextValueManager.GetRank(Board[0, 0]);
+        for (int y=0; y<HEIGHT; y++)
+        {
+            for (int x=0; x<WIDTH; x++)
+            {
+                int curRank = NextValueManager.GetRank(Board[y, x]);
+                if (curRank > highestRank)
+                    highestRank = curRank;
+            }
+        }
+
+        List<int> ret = nvm.PredictFuture(numMoves, highestRank);
+        RenderNextCell(nextBox, ret);
+        return ret;
     }
 
     void Update()
@@ -94,16 +112,18 @@ public class GameManager : MonoBehaviour
 
         if (direction != Direction.Invalid && CheckMove(direction, out res))
         {
+            numMoves++;
             Debug.Log(String.Format("Going {0} is possible", direction.ToString()));
             ApplyMove(direction, res);
-            AddNewNumber(direction);
-            GenerateNextValue();
+            AddNextValueToBoard(direction);
+            nextValues = GenerateNextValue();
         }
     }
 
-    private void AddNewNumber(Direction direction)
+    private void AddNextValueToBoard(Direction direction)
     {
         int random = UnityEngine.Random.Range(0, WIDTH);
+        int nextValue = nextValues[UnityEngine.Random.Range(0, nextValues.Count)];
 
         switch (direction)
         {
@@ -112,28 +132,28 @@ public class GameManager : MonoBehaviour
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[HEIGHT - 1, random] = next_value;
+                Board[HEIGHT - 1, random] = nextValue;
                 break;
             case Direction.Down:
                 while (Board[0, random] != 0)
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[0, random] = next_value;
+                Board[0, random] = nextValue;
                 break;
             case Direction.Left:
                 while (Board[random, WIDTH-1] != 0)
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[random, WIDTH-1] = next_value;
+                Board[random, WIDTH - 1] = nextValue;
                 break;
             case Direction.Right:
                 while (Board[random, 0] != 0)
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[random, 0] = next_value;
+                Board[random, 0] = nextValue;
                 break;
         }
         UpdateBoard();
@@ -283,12 +303,12 @@ public class GameManager : MonoBehaviour
             {
                 GameObject curr_cell = ObjectBoard[y, x];
                 int number = Board[y, x];
-                render_cell(curr_cell, number);
+                RenderCell(curr_cell, number);
             }
         }
     }
 
-    private void render_cell(GameObject cell, int value)
+    private void RenderCell(GameObject cell, int value)
     {
         Text text_object = cell.transform.Find("Text").GetComponent<Text>();
         text_object.text = value.ToString();
@@ -300,6 +320,41 @@ public class GameManager : MonoBehaviour
                 color = white_color;
                 text_object.text = "";
                 break;
+            case 1:
+                color = red_color;
+                text_object.color = Color.white;
+                break;
+            case 2:
+                color = blue_color;
+                text_object.color = Color.white;
+                break;
+            default:
+                color = white_color;
+                text_object.color = Color.red;
+                break;
+        }
+        cell.GetComponent<Image>().material = color;
+    }
+
+    private void RenderNextCell(GameObject cell, List<int> nextValues)
+    {
+        Text text_object = cell.transform.Find("Text").GetComponent<Text>();
+        if (nextValues.Count == 1 && nextValues[0] >= 1 && nextValues[0] <= 3)
+            text_object.text = "";
+        else
+            text_object.text = String.Join(",", nextValues);
+
+        for (int i=0; i<nextValues.Count; i++)
+        {
+            if (nextValues[i] == 307 || nextValues[i] == 7 || nextValues[i] > 40)
+            {
+                int r = 1;
+            }
+        }
+
+        Material color;
+        switch (nextValues[0])
+        {
             case 1:
                 color = red_color;
                 text_object.color = Color.white;
