@@ -87,7 +87,9 @@ public class NextValueManager
 			{
 				if (i < num)
 				{
-					ret.Add(GetValue(Mathf.Clamp(rank - 1 - i, 1, 11)));
+					int calculated_rank = Mathf.Clamp(rank - 1 - i, 1, 11);
+					// It took quite some time to figure out that in case of multi value, the tile is not GetValue(rank) but rather GetValue(rank+1)
+					ret.Add(GetValue(calculated_rank+1));
 				}
 			}
 		}
