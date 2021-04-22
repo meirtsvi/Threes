@@ -26,17 +26,29 @@ public class GameManager : MonoBehaviour
 
     int numMoves;
     private GameObject nextBox;
-    NextValueManager nvm;
-    List<int> nextValues;
+    private float nextBoxOrigialWidth;
+    private NextValueManager nvm;
+    private List<int> nextValues;
 
     private Material red_color, blue_color, white_color;
 
     private Canvas canvas;
-    RectTransform canvas_rt;
+    private RectTransform canvas_rt;
 
+    private GameObject gameOverObj;
+    private bool gameOver;
+
+    private Text scoreObj;
 
     void Start()
     {
+        gameOverObj = GameObject.Find("GameOver");
+        gameOverObj.SetActive(false);
+        gameOver = false;
+
+        GameObject scoreContainer = GameObject.Find("Score");
+        scoreObj = scoreContainer.GetComponent<Text>();
+
         numMoves = 0;
         nvm = new NextValueManager();
         GameObject canvas_container = GameObject.Find("Canvas");
@@ -65,6 +77,8 @@ public class GameManager : MonoBehaviour
     private void CreateNextBox()
     {
         GameObject newSquare = Instantiate(squarePrefab, new Vector3(0, 0, 0), Quaternion.identity, canvas.transform);
+        RectTransform rt = newSquare.GetComponent<RectTransform>();
+        nextBoxOrigialWidth = rt.rect.width;
         newSquare.transform.localPosition = new Vector3(100, -50, 0);
         Text text_object = newSquare.transform.Find("Text").GetComponent<Text>();
         text_object.transform.localPosition = new Vector3(-0.5f, -0.5f, 0);
@@ -85,6 +99,16 @@ public class GameManager : MonoBehaviour
         }
 
         List<int> ret = nvm.PredictFuture(numMoves, highestRank);
+
+        RectTransform rt = nextBox.GetComponent<RectTransform>();
+        Text text = nextBox.transform.Find("Text").GetComponent<Text>();
+        text.fontSize = 50;
+        rt.sizeDelta = new Vector2(nextBoxOrigialWidth, rt.rect.height);
+        if (ret.Count > 1)
+        {
+            text.fontSize = 25;
+            rt.sizeDelta = new Vector2(nextBoxOrigialWidth*2, rt.rect.height);
+        }
         RenderNextCell(nextBox, ret);
         return ret;
     }
@@ -93,6 +117,9 @@ public class GameManager : MonoBehaviour
     {
         int[] res;
         Direction direction = Direction.Invalid;
+
+        if (gameOver)
+            return;
 
         if (Input.GetKeyDown(KeyCode.LeftArrow))
         {
@@ -117,7 +144,47 @@ public class GameManager : MonoBehaviour
             ApplyMove(direction, res);
             AddNextValueToBoard(direction);
             nextValues = GenerateNextValue();
+            UpdateScore();
+
+            if (!CheckMove(Direction.Up, out res) &&
+                !CheckMove(Direction.Down, out res) &&
+                !CheckMove(Direction.Left, out res) &&
+                !CheckMove(Direction.Right, out res))
+            {
+                gameOver = true;
+                gameOverObj.SetActive(true);
+            }
         }
+    }
+
+    private void UpdateScore()
+    {
+        int score = 0;
+        for (int y=0; y<HEIGHT; y++)
+        {
+            for (int x=0; x<WIDTH; x++)
+            {
+                int value = Board[y, x];
+                if (value < 3)
+                    continue;
+
+                int rank = NextValueManager.GetRank(value);
+                if (rank >= 1)
+                {
+                    score += (int)Mathf.Pow(3f, (float)rank);
+                }
+            }
+        }
+
+        String scoreText = score.ToString();
+        if (scoreText.Length > 3)
+        {
+            for (int i=scoreText.Length-3; i>0; i-=3)
+            {
+                scoreText = scoreText.Substring(0, i) + "," + scoreText.Substring(i);
+            }
+        }
+        scoreObj.text = scoreText;
     }
 
     private void AddNextValueToBoard(Direction direction)
