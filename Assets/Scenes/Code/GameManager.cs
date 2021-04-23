@@ -115,7 +115,6 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        int[] possibleMoves;
         Direction direction = Direction.Invalid;
 
         if (gameOver)
@@ -124,7 +123,8 @@ public class GameManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.LeftArrow))
         {
             direction = Direction.Left;
-        } else if (Input.GetKeyDown(KeyCode.RightArrow))
+        }
+        else if (Input.GetKeyDown(KeyCode.RightArrow))
         {
             direction = Direction.Right;
         }
