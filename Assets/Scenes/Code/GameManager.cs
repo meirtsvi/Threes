@@ -12,7 +12,7 @@ public class GameManager : MonoBehaviour
 
     private const int IMPOSSIBLE_MOVE = -1;
 
-    private enum Direction
+    public enum Direction
     {
         Invalid,
         Up,
@@ -27,13 +27,13 @@ public class GameManager : MonoBehaviour
     int numMoves;
     private GameObject nextBox;
     private float nextBoxOrigialWidth;
-    private NextValueManager nvm;
+    private NextValueManager nextValueManager;
     private List<int> nextValues;
 
-    private Material red_color, blue_color, white_color;
+    private Material redColor, blueColor, whiteColor;
 
     private Canvas canvas;
-    private RectTransform canvas_rt;
+    private RectTransform canvasRt;
 
     private GameObject gameOverObj;
     private bool gameOver;
@@ -50,10 +50,10 @@ public class GameManager : MonoBehaviour
         scoreObj = scoreContainer.GetComponent<Text>();
 
         numMoves = 0;
-        nvm = new NextValueManager();
-        GameObject canvas_container = GameObject.Find("Canvas");
-        canvas = canvas_container.GetComponent<Canvas>();
-        canvas_rt = (RectTransform)squarePrefab.transform;
+        nextValueManager = new NextValueManager();
+        GameObject canvasContainer = GameObject.Find("Canvas");
+        canvas = canvasContainer.GetComponent<Canvas>();
+        canvasRt = (RectTransform)squarePrefab.transform;
 
         for (int y=0; y<HEIGHT; y++)
         {
@@ -62,9 +62,9 @@ public class GameManager : MonoBehaviour
                 Board[y, x] = 0;
             }
         }
-        red_color = Resources.Load<Material>("Materials/RedMaterial");
-        blue_color = Resources.Load<Material>("Materials/BlueMaterial");
-        white_color = Resources.Load<Material>("Materials/WhiteMaterial");
+        redColor = Resources.Load<Material>("Materials/RedMaterial");
+        blueColor = Resources.Load<Material>("Materials/BlueMaterial");
+        whiteColor = Resources.Load<Material>("Materials/WhiteMaterial");
         
         CreateBoard();
         SetInitialBoard();
@@ -80,8 +80,8 @@ public class GameManager : MonoBehaviour
         RectTransform rt = newSquare.GetComponent<RectTransform>();
         nextBoxOrigialWidth = rt.rect.width;
         newSquare.transform.localPosition = new Vector3(100, -50, 0);
-        Text text_object = newSquare.transform.Find("Text").GetComponent<Text>();
-        text_object.transform.localPosition = new Vector3(-0.5f, -0.5f, 0);
+        Text textObject = newSquare.transform.Find("Text").GetComponent<Text>();
+        textObject.transform.localPosition = new Vector3(-0.5f, -0.5f, 0);
         nextBox = newSquare;
     }
 
@@ -98,7 +98,7 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        List<int> ret = nvm.PredictFuture(numMoves, highestRank);
+        List<int> ret = nextValueManager.PredictFuture(numMoves, highestRank);
 
         RectTransform rt = nextBox.GetComponent<RectTransform>();
         Text text = nextBox.transform.Find("Text").GetComponent<Text>();
@@ -115,7 +115,7 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        int[] res;
+        int[] possibleMoves;
         Direction direction = Direction.Invalid;
 
         if (gameOver)
@@ -137,24 +137,34 @@ public class GameManager : MonoBehaviour
             direction = Direction.Up;
         }
 
-        if (direction != Direction.Invalid && CheckMove(direction, out res))
+        if (direction != Direction.Invalid)
         {
-            numMoves++;
-            Debug.Log(String.Format("Going {0} is possible", direction.ToString()));
-            ApplyMove(direction, res);
-            AddNextValueToBoard(direction);
-            nextValues = GenerateNextValue();
-            UpdateScore();
-
-            if (!CheckMove(Direction.Up, out res) &&
-                !CheckMove(Direction.Down, out res) &&
-                !CheckMove(Direction.Left, out res) &&
-                !CheckMove(Direction.Right, out res))
-            {
-                gameOver = true;
-                gameOverObj.SetActive(true);
-            }
+            MakeMove(direction);
         }
+    }
+
+    public bool MakeMove(Direction direction)
+    {
+        int[] possibleMoves;
+        if (!CheckMove(direction, out possibleMoves))
+            return false;
+
+        this.numMoves++;
+        ApplyMove(direction, possibleMoves);
+        AddNextValueToBoard(direction);
+        nextValues = GenerateNextValue();
+        UpdateScore();
+
+        if (!CheckMove(Direction.Up, out possibleMoves) &&
+            !CheckMove(Direction.Down, out possibleMoves) &&
+            !CheckMove(Direction.Left, out possibleMoves) &&
+            !CheckMove(Direction.Right, out possibleMoves))
+        {
+            gameOver = true;
+            gameOverObj.SetActive(true);
+        }
+
+        return true;
     }
 
     private void UpdateScore()
@@ -288,51 +298,51 @@ public class GameManager : MonoBehaviour
 
     private void SetMoveResult(Direction direction, int x, int y)
     {
-        int target_x, target_y;
+        int targetX, targetY;
         switch (direction)
         {
             case Direction.Up:
-                target_x = x;
-                target_y = y - 1;
+                targetX = x;
+                targetY = y - 1;
                 break;
             case Direction.Down:
-                target_x = x;
-                target_y = y + 1;
+                targetX = x;
+                targetY = y + 1;
                 break;
             case Direction.Left:
-                target_x = x - 1;
-                target_y = y;                     
+                targetX = x - 1;
+                targetY = y;                     
                 break;
             case Direction.Right:
-                target_x = x + 1;
-                target_y = y;
+                targetX = x + 1;
+                targetY = y;
                 break;
             default:
                 throw new Exception("Should not get here");
         }
 
-        if (target_x < 0 || target_y < 0)
+        if (targetX < 0 || targetY < 0)
         {
             x = 1;
         }
-        int target_value = Board[target_y, target_x];
-        int source_value = Board[y, x];
-        if (target_value == 0)
+        int targetValue = Board[targetY, targetX];
+        int sourceValue = Board[y, x];
+        if (targetValue == 0)
         {
-            Board[target_y, target_x] = Board[y, x];
+            Board[targetY, targetX] = Board[y, x];
         }
         else
         {
-            if ((target_value == 1 && source_value == 2) ||
-                (target_value == 2 && source_value == 1))
+            if ((targetValue == 1 && sourceValue == 2) ||
+                (targetValue == 2 && sourceValue == 1))
             {
-                Board[target_y, target_x] = 3;
+                Board[targetY, targetX] = 3;
             }
             else
             {
-                if (target_value == source_value)
+                if (targetValue == sourceValue)
                 {
-                    Board[target_y, target_x] = target_value * 2;
+                    Board[targetY, targetX] = targetValue * 2;
                 }
             }
         }
@@ -342,23 +352,14 @@ public class GameManager : MonoBehaviour
     private void SetInitialBoard()
     {
         int x, y;
-        for (int i=0; i<3; i++)
+        for (int i=0; i<9; i++)
         {
             do
             {
                 x = UnityEngine.Random.Range(0, WIDTH);
                 y = UnityEngine.Random.Range(0, HEIGHT);
             } while (Board[y, x] != 0);
-            Board[y, x] = 1;
-        }
-        for (int i = 0; i < 2; i++)
-        {
-            do
-            {
-                x = UnityEngine.Random.Range(0, WIDTH);
-                y = UnityEngine.Random.Range(0, HEIGHT);
-            } while (Board[y, x] != 0);
-            Board[y, x] = 2;
+            Board[y, x] = UnityEngine.Random.Range(1, 4);
         }
     }
 
@@ -368,36 +369,36 @@ public class GameManager : MonoBehaviour
         {
             for (int x = 0; x < WIDTH; x++)
             {
-                GameObject curr_cell = ObjectBoard[y, x];
+                GameObject currCell = ObjectBoard[y, x];
                 int number = Board[y, x];
-                RenderCell(curr_cell, number);
+                RenderCell(currCell, number);
             }
         }
     }
 
     private void RenderCell(GameObject cell, int value)
     {
-        Text text_object = cell.transform.Find("Text").GetComponent<Text>();
-        text_object.text = value.ToString();
+        Text textObject = cell.transform.Find("Text").GetComponent<Text>();
+        textObject.text = value.ToString();
 
         Material color;
         switch (value)
         {
             case 0:
-                color = white_color;
-                text_object.text = "";
+                color = whiteColor;
+                textObject.text = "";
                 break;
             case 1:
-                color = red_color;
-                text_object.color = Color.white;
+                color = redColor;
+                textObject.color = Color.white;
                 break;
             case 2:
-                color = blue_color;
-                text_object.color = Color.white;
+                color = blueColor;
+                textObject.color = Color.white;
                 break;
             default:
-                color = white_color;
-                text_object.color = Color.red;
+                color = whiteColor;
+                textObject.color = Color.red;
                 break;
         }
         cell.GetComponent<Image>().material = color;
@@ -405,26 +406,26 @@ public class GameManager : MonoBehaviour
 
     private void RenderNextCell(GameObject cell, List<int> nextValues)
     {
-        Text text_object = cell.transform.Find("Text").GetComponent<Text>();
+        Text textObject = cell.transform.Find("Text").GetComponent<Text>();
         if (nextValues.Count == 1 && nextValues[0] >= 1 && nextValues[0] <= 3)
-            text_object.text = "";
+            textObject.text = "";
         else
-            text_object.text = String.Join(",", nextValues);
+            textObject.text = String.Join(",", nextValues);
 
         Material color;
         switch (nextValues[0])
         {
             case 1:
-                color = red_color;
-                text_object.color = Color.white;
+                color = redColor;
+                textObject.color = Color.white;
                 break;
             case 2:
-                color = blue_color;
-                text_object.color = Color.white;
+                color = blueColor;
+                textObject.color = Color.white;
                 break;
             default:
-                color = white_color;
-                text_object.color = Color.red;
+                color = whiteColor;
+                textObject.color = Color.red;
                 break;
         }
         cell.GetComponent<Image>().material = color;
@@ -432,16 +433,16 @@ public class GameManager : MonoBehaviour
 
     private void DrawCell(int x, int y)
     {
-        float squareWidth = canvas_rt.rect.width;
-        float squareHeight = canvas_rt.rect.height;
-        float zero_x = ((-1) * canvas.pixelRect.width / 2) + (squareWidth / 2);
-        float zero_y = ((-1) * canvas.pixelRect.height / 2) + (squareHeight / 2);
-        float x_pos = zero_x + squareWidth * x;
-        float y_pos = zero_y + squareHeight * y;
+        float squareWidth = canvasRt.rect.width;
+        float squareHeight = canvasRt.rect.height;
+        float zeroX = ((-1) * canvas.pixelRect.width / 2) + (squareWidth / 2);
+        float zeroY = ((-1) * canvas.pixelRect.height / 2) + (squareHeight / 2);
+        float xPos = zeroX + squareWidth * x;
+        float yPos = zeroY + squareHeight * y;
         GameObject newSquare = Instantiate(squarePrefab, new Vector3(0, 0, 0), Quaternion.identity, canvas.transform);
-        newSquare.transform.localPosition = new Vector3(x_pos, y_pos, 0);
-        Text text_object = newSquare.transform.Find("Text").GetComponent<Text>();
-        text_object.transform.localPosition = new Vector3(-0.5f, -0.5f, 0);
+        newSquare.transform.localPosition = new Vector3(xPos, yPos, 0);
+        Text textObject = newSquare.transform.Find("Text").GetComponent<Text>();
+        textObject.transform.localPosition = new Vector3(-0.5f, -0.5f, 0);
         ObjectBoard[y, x] = newSquare;
     }
 
@@ -456,10 +457,10 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private bool CheckCellMove(int x_from, int y_from, int x_to, int y_to)
+    private bool CheckCellMove(int xFrom, int yFrom, int xTo, int yTo)
     {
-        int from = Board[y_from, x_from];
-        int to = Board[y_to, x_to];
+        int from = Board[yFrom, xFrom];
+        int to = Board[yTo, xTo];
 
         if (to == 0)
             return true;
@@ -472,12 +473,12 @@ public class GameManager : MonoBehaviour
         return false;
     }
 
-    private bool CheckMove(Direction direction, out int[] possible_moves)
+    private bool CheckMove(Direction direction, out int[] possibleMoves)
     {
         //assert(WIDTH == HEIGHT);
-        possible_moves = new int[WIDTH];
+        possibleMoves = new int[WIDTH];
         for (int i = 0; i < WIDTH; i++)
-            possible_moves[i] = IMPOSSIBLE_MOVE;
+            possibleMoves[i] = IMPOSSIBLE_MOVE;
 
         switch (direction)
         {
@@ -488,7 +489,7 @@ public class GameManager : MonoBehaviour
                     {
                         if (CheckCellMove(x, y, x, y-1))
                         {
-                            possible_moves[x] = y;
+                            possibleMoves[x] = y;
                             break;
                         }
                     }
@@ -501,7 +502,7 @@ public class GameManager : MonoBehaviour
                     {
                         if (CheckCellMove(x, y, x, y + 1))
                         {
-                            possible_moves[x] = y;
+                            possibleMoves[x] = y;
                             break;
                         }
                     }
@@ -514,7 +515,7 @@ public class GameManager : MonoBehaviour
                     {
                         if (CheckCellMove(x, y, x-1, y))
                         {
-                            possible_moves[y] = x;
+                            possibleMoves[y] = x;
                             break;
                         }
                     }
@@ -527,7 +528,7 @@ public class GameManager : MonoBehaviour
                     {
                         if (CheckCellMove(x, y, x + 1, y))
                         {
-                            possible_moves[y] = x;
+                            possibleMoves[y] = x;
                             break;
                         }
                     }
@@ -539,7 +540,7 @@ public class GameManager : MonoBehaviour
 
         for (int i=0; i<WIDTH; i++)
         {
-            if (possible_moves[i] != IMPOSSIBLE_MOVE)
+            if (possibleMoves[i] != IMPOSSIBLE_MOVE)
                 return true;
         }
         return false;
