@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
@@ -39,12 +40,19 @@ public class GameManager : MonoBehaviour
     private bool gameOver;
 
     private Text scoreObj;
+    public void Restart()
+    {
+        SceneManager.LoadSceneAsync(SceneManager.GetActiveScene().buildIndex);
+    }
 
     void Start()
     {
         gameOverObj = GameObject.Find("GameOver");
         gameOverObj.SetActive(false);
         gameOver = false;
+        GameObject restartButton = GameObject.Find("RestartButton");
+        restartButton.GetComponent<Button>().onClick.AddListener(Restart);
+
 
         GameObject scoreContainer = GameObject.Find("Score");
         scoreObj = scoreContainer.GetComponent<Text>();
@@ -55,9 +63,9 @@ public class GameManager : MonoBehaviour
         canvas = canvasContainer.GetComponent<Canvas>();
         canvasRt = (RectTransform)squarePrefab.transform;
 
-        for (int y=0; y<HEIGHT; y++)
+        for (int y = 0; y < HEIGHT; y++)
         {
-            for (int x=0; x<WIDTH; x++)
+            for (int x = 0; x < WIDTH; x++)
             {
                 Board[y, x] = 0;
             }
@@ -65,7 +73,7 @@ public class GameManager : MonoBehaviour
         redColor = Resources.Load<Material>("Materials/RedMaterial");
         blueColor = Resources.Load<Material>("Materials/BlueMaterial");
         whiteColor = Resources.Load<Material>("Materials/WhiteMaterial");
-        
+
         CreateBoard();
         SetInitialBoard();
         UpdateBoard();
