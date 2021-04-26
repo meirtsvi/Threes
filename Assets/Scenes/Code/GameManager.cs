@@ -1,11 +1,11 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
+
 using UnityEngine;
 using UnityEngine.UI;
-
 using Unity.MLAgents;
 using Unity.MLAgents.Sensors;
-using System.IO;
 
 public class GameManager : Agent
 {
@@ -63,7 +63,6 @@ public class GameManager : Agent
     public void Restart()
     {
         Init();
-//        SceneManager.LoadSceneAsync(SceneManager.GetActiveScene().buildIndex);
     }
 
     private void DumpResults()
@@ -139,6 +138,7 @@ public class GameManager : Agent
     }
     void Start()
     {
+        Application.runInBackground = true;
         highScore = 0;
         highestNMoves = 0;
         highestRank = 0;
