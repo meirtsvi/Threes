@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public class GameManager : MonoBehaviour
+using Unity.MLAgents;
+using Unity.MLAgents.Sensors;
+using System.IO;
+
+public class GameManager : Agent
 {
     public GameObject squarePrefab;
     
@@ -15,11 +18,11 @@ public class GameManager : MonoBehaviour
 
     public enum Direction
     {
-        Invalid,
         Up,
         Down,
         Left,
-        Right
+        Right,
+        Invalid
     }
 
     private int[,] Board = new int[HEIGHT, WIDTH];
@@ -39,29 +42,87 @@ public class GameManager : MonoBehaviour
     private GameObject gameOverObj;
     private bool gameOver;
 
+    private int score;
     private Text scoreObj;
+    private Text highScoreObj;
+    private Text highestNMovesObj;
+    private Text highestRankObj;
+    private GameObject scoreContainer;
+    private GameObject highScoreContainer;
+    private GameObject highestNMovesContainer;
+    private GameObject highestRankContainer;
+
+    private GameObject restartButton;
+
+    private int highScore;
+    private int nTimesHighScoreAchieved;
+    private int highestNMoves;
+    private int highestRank;
+    private int nTimeHighestRankAchieved;
+
     public void Restart()
     {
-        SceneManager.LoadSceneAsync(SceneManager.GetActiveScene().buildIndex);
+        Init();
+//        SceneManager.LoadSceneAsync(SceneManager.GetActiveScene().buildIndex);
     }
 
-    void Start()
+    private void DumpResults()
     {
-        gameOverObj = GameObject.Find("GameOver");
+        File.WriteAllText(@"c:\src\threes\ml_stats.txt",
+            "High Score: " + highScore + ", in number of moves: " + numMoves + ", achieved " + nTimesHighScoreAchieved + " times. " +
+            "Highest number of moves: " + highestNMoves + ". " +
+            "Highest Rank: " + highestRank + " achieved "+ nTimeHighestRankAchieved + " times");
+    }
+    private void Init()
+    {
+        highScoreObj = highScoreContainer.GetComponent<Text>();
+        if (score > highScore)
+        {
+            nTimesHighScoreAchieved = 1;
+            highScore = score;
+            highScoreObj.text = highScore.ToString() + " (" + numMoves + ", 1)";
+            DumpResults();
+        }
+        else if (score == highScore)
+        {
+            nTimesHighScoreAchieved++;
+            highScoreObj.text = highScore.ToString() + " (" + numMoves + ", " + nTimesHighScoreAchieved + ")";
+            DumpResults();
+        }
+
+        highestNMovesObj = highestNMovesContainer.GetComponent<Text>();
+        if (numMoves > highestNMoves)
+        {
+            highestNMoves = numMoves;
+            highestNMovesObj.text = highestNMoves.ToString();
+            DumpResults();
+        }
+
+        int curHighestRank = GetHighestRank();
+        highestRankObj = highestRankContainer.GetComponent<Text>();
+        if (curHighestRank > highestRank)
+        {
+            nTimeHighestRankAchieved = 1;
+            highestRank = curHighestRank;
+            highestRankObj.text = highestRank.ToString() + " (" + nTimeHighestRankAchieved + ")";
+            DumpResults();
+        }
+        else if (curHighestRank == highestRank)
+        {
+            nTimeHighestRankAchieved++;
+            highestRankObj.text = highestRank.ToString() + " (" + nTimeHighestRankAchieved + ")";
+            DumpResults();
+        }
+
         gameOverObj.SetActive(false);
         gameOver = false;
-        GameObject restartButton = GameObject.Find("RestartButton");
         restartButton.GetComponent<Button>().onClick.AddListener(Restart);
 
-
-        GameObject scoreContainer = GameObject.Find("Score");
         scoreObj = scoreContainer.GetComponent<Text>();
+        score = 0;
 
         numMoves = 0;
         nextValueManager = new NextValueManager();
-        GameObject canvasContainer = GameObject.Find("Canvas");
-        canvas = canvasContainer.GetComponent<Canvas>();
-        canvasRt = (RectTransform)squarePrefab.transform;
 
         for (int y = 0; y < HEIGHT; y++)
         {
@@ -70,16 +131,37 @@ public class GameManager : MonoBehaviour
                 Board[y, x] = 0;
             }
         }
+
+        FillInitialBoard();
+        UpdateBoard();
+        UpdateScore();
+        nextValues = GenerateNextValue();
+    }
+    void Start()
+    {
+        highScore = 0;
+        highestNMoves = 0;
+        highestRank = 0;
+        
+        gameOverObj = GameObject.Find("GameOver");
+        scoreContainer = GameObject.Find("Score");
+        highScoreContainer = GameObject.Find("HighScore");
+        highestNMovesContainer = GameObject.Find("HighestNMoves");
+        highestRankContainer = GameObject.Find("HighestRank");
+
+        restartButton = GameObject.Find("RestartButton");
+        
         redColor = Resources.Load<Material>("Materials/RedMaterial");
         blueColor = Resources.Load<Material>("Materials/BlueMaterial");
         whiteColor = Resources.Load<Material>("Materials/WhiteMaterial");
 
-        CreateBoard();
-        SetInitialBoard();
-        UpdateBoard();
+        GameObject canvasContainer = GameObject.Find("Canvas");
+        canvas = canvasContainer.GetComponent<Canvas>();
+        canvasRt = (RectTransform)squarePrefab.transform;
 
+        CreateBoard();
         CreateNextBox();
-        nextValues = GenerateNextValue();
+        Init();
     }
 
     private void CreateNextBox()
@@ -93,12 +175,12 @@ public class GameManager : MonoBehaviour
         nextBox = newSquare;
     }
 
-    private List<int> GenerateNextValue()
+    private int GetHighestRank()
     {
         int highestRank = NextValueManager.GetRank(Board[0, 0]);
-        for (int y=0; y<HEIGHT; y++)
+        for (int y = 0; y < HEIGHT; y++)
         {
-            for (int x=0; x<WIDTH; x++)
+            for (int x = 0; x < WIDTH; x++)
             {
                 int curRank = NextValueManager.GetRank(Board[y, x]);
                 if (curRank > highestRank)
@@ -106,6 +188,11 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        return highestRank;
+    }
+    private List<int> GenerateNextValue()
+    {
+        int highestRank = GetHighestRank();
         List<int> ret = nextValueManager.PredictFuture(numMoves, highestRank);
 
         RectTransform rt = nextBox.GetComponent<RectTransform>();
@@ -153,6 +240,9 @@ public class GameManager : MonoBehaviour
 
     public bool MakeMove(Direction direction)
     {
+        if (direction == Direction.Invalid)
+            return false;
+
         int[] possibleMoves;
         if (!CheckMove(direction, out possibleMoves))
             return false;
@@ -177,10 +267,10 @@ public class GameManager : MonoBehaviour
 
     private void UpdateScore()
     {
-        int score = 0;
-        for (int y=0; y<HEIGHT; y++)
+        int curScore = 0;
+        for (int y = 0; y < HEIGHT; y++)
         {
-            for (int x=0; x<WIDTH; x++)
+            for (int x = 0; x < WIDTH; x++)
             {
                 int value = Board[y, x];
                 if (value < 3)
@@ -189,20 +279,26 @@ public class GameManager : MonoBehaviour
                 int rank = NextValueManager.GetRank(value);
                 if (rank >= 1)
                 {
-                    score += (int)Mathf.Pow(3f, (float)rank);
+                    curScore += (int)Mathf.Pow(3f, (float)rank);
                 }
             }
         }
 
-        String scoreText = score.ToString();
+        score = curScore;
+        scoreObj.text = AddThousandsSeparator(score.ToString());
+    }
+
+    private static string AddThousandsSeparator(string scoreText)
+    {
         if (scoreText.Length > 3)
         {
-            for (int i=scoreText.Length-3; i>0; i-=3)
+            for (int i = scoreText.Length - 3; i > 0; i -= 3)
             {
                 scoreText = scoreText.Substring(0, i) + "," + scoreText.Substring(i);
             }
         }
-        scoreObj.text = scoreText;
+
+        return scoreText;
     }
 
     private void AddNextValueToBoard(Direction direction)
@@ -357,7 +453,7 @@ public class GameManager : MonoBehaviour
         Board[y, x] = 0;
     }
 
-    private void SetInitialBoard()
+    private void FillInitialBoard()
     {
         int x, y;
         for (int i=0; i<9; i++)
@@ -552,5 +648,75 @@ public class GameManager : MonoBehaviour
                 return true;
         }
         return false;
+    }
+
+    public override void OnEpisodeBegin()
+    {
+        Init();
+    }
+
+    public override void CollectObservations(VectorSensor sensor)
+    {
+        for (int y = 0; y < HEIGHT; y++)
+        {
+            for (int x = 0; x < WIDTH; x++)
+            {
+                sensor.AddObservation(Board[y, x]);
+            }
+        }
+    }
+
+    public override void OnActionReceived(float[] vectorAction)
+    {
+        if (numMoves > 400)
+        {
+            SetReward(-1.0f);
+            EndEpisode();
+            return;
+        }
+
+        int prevHighestRank = GetHighestRank();
+        Direction direction = (Direction)vectorAction[0];
+        if (!MakeMove(direction))
+        {
+            // Probably due to a bug, the CollectDiscreteActionMasks is not always called before OnActionReceived
+            // so there is a chance that vectionAction will require to make impossible move.
+            // Don't change reward or end episode, simply exit in the hope that the brain WILL call CollectDiscreteActionMasks
+            // on the next round before calling OnActionReceived.
+            return;
+        }
+        if (GetHighestRank() > prevHighestRank)
+        {
+            AddReward(0.15f);
+        }
+
+        if (gameOver)
+        {
+            SetReward(-1.0f);
+            EndEpisode();
+            return;
+        }
+
+        if (GetHighestRank() == 8)
+        {
+            SetReward(1.0f);
+            EndEpisode();
+            return;
+        }
+
+        AddReward(0.002f);
+    }
+
+    public override void CollectDiscreteActionMasks(DiscreteActionMasker actionMasker)
+    {
+        List<int> impossibleMoves = new List<int>();
+        int[] possibleMoves;
+
+        for (Direction i = Direction.Up; i < Direction.Invalid; i++)
+        {
+            if (!CheckMove(i, out possibleMoves))
+                impossibleMoves.Add((int)i);
+        }
+        actionMasker.SetMask(0, impossibleMoves);
     }
 }
