@@ -79,13 +79,13 @@ public class GameManager : Agent
         {
             nTimesHighScoreAchieved = 1;
             highScore = score;
-            highScoreObj.text = highScore.ToString() + " (" + numMoves + ", 1)";
+            highScoreObj.text = AddThousandsSeparator(highScore.ToString()) + " (" + numMoves + ", 1)";
             DumpResults();
         }
         else if (score == highScore)
         {
             nTimesHighScoreAchieved++;
-            highScoreObj.text = highScore.ToString() + " (" + numMoves + ", " + nTimesHighScoreAchieved + ")";
+            highScoreObj.text = AddThousandsSeparator(highScore.ToString()) + " (" + numMoves + ", " + nTimesHighScoreAchieved + ")";
             DumpResults();
         }
 
@@ -650,9 +650,11 @@ public class GameManager : Agent
         return false;
     }
 
+    static float step_reward = 0.004f;
     public override void OnEpisodeBegin()
     {
         Init();
+        step_reward = 0.004f;
     }
 
     public override void CollectObservations(VectorSensor sensor)
@@ -668,12 +670,12 @@ public class GameManager : Agent
 
     public override void OnActionReceived(float[] vectorAction)
     {
-        if (numMoves > 400)
-        {
-            SetReward(-1.0f);
-            EndEpisode();
-            return;
-        }
+        //if (numMoves > 400)
+        //{
+        //    SetReward(-1.0f);
+        //    EndEpisode();
+        //    return;
+        //}
 
         int prevHighestRank = GetHighestRank();
         Direction direction = (Direction)vectorAction[0];
@@ -704,7 +706,8 @@ public class GameManager : Agent
             return;
         }
 
-        AddReward(0.002f);
+        AddReward(step_reward);
+        step_reward += 0.001f;
     }
 
     public override void CollectDiscreteActionMasks(DiscreteActionMasker actionMasker)
