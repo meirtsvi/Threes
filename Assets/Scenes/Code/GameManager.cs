@@ -10,7 +10,7 @@ using Unity.MLAgents.Sensors;
 public class GameManager : Agent
 {
     public GameObject squarePrefab;
-    
+
     private const int WIDTH = 4;
     private const int HEIGHT = 4;
 
@@ -22,10 +22,10 @@ public class GameManager : Agent
         Down,
         Left,
         Right,
-        Invalid
+        DirectionsCount
     }
 
-    private int[,] Board = new int[HEIGHT, WIDTH];
+    private int[,] board = new int[HEIGHT, WIDTH];
     private GameObject[,] ObjectBoard = new GameObject[HEIGHT, WIDTH];
 
     int numMoves;
@@ -60,6 +60,9 @@ public class GameManager : Agent
     private int highestRank;
     private int nTimeHighestRankAchieved;
 
+    private List<int[,]> bestPlayMoves;
+    private float lastReward;
+
     public void Restart()
     {
         Init();
@@ -70,7 +73,7 @@ public class GameManager : Agent
         File.WriteAllText(@"c:\src\threes\ml_stats.txt",
             "High Score: " + highScore + ", in number of moves: " + numMoves + ", achieved " + nTimesHighScoreAchieved + " times. " +
             "Highest number of moves: " + highestNMoves + ". " +
-            "Highest Rank: " + highestRank + " achieved "+ nTimeHighestRankAchieved + " times");
+            "Highest Rank: " + highestRank + " achieved " + nTimeHighestRankAchieved + " times");
     }
     private void Init()
     {
@@ -95,6 +98,7 @@ public class GameManager : Agent
             highestNMoves = numMoves;
             highestNMovesObj.text = highestNMoves.ToString();
             DumpResults();
+            DumpBestPlay();
         }
 
         int curHighestRank = GetHighestRank();
@@ -127,7 +131,7 @@ public class GameManager : Agent
         {
             for (int x = 0; x < WIDTH; x++)
             {
-                Board[y, x] = 0;
+                board[y, x] = 0;
             }
         }
 
@@ -135,6 +139,8 @@ public class GameManager : Agent
         UpdateBoard();
         UpdateScore();
         nextValues = GenerateNextValue();
+
+        bestPlayMoves.Clear();
     }
     void Start()
     {
@@ -142,7 +148,7 @@ public class GameManager : Agent
         highScore = 0;
         highestNMoves = 0;
         highestRank = 0;
-        
+
         gameOverObj = GameObject.Find("GameOver");
         scoreContainer = GameObject.Find("Score");
         highScoreContainer = GameObject.Find("HighScore");
@@ -150,7 +156,7 @@ public class GameManager : Agent
         highestRankContainer = GameObject.Find("HighestRank");
 
         restartButton = GameObject.Find("RestartButton");
-        
+
         redColor = Resources.Load<Material>("Materials/RedMaterial");
         blueColor = Resources.Load<Material>("Materials/BlueMaterial");
         whiteColor = Resources.Load<Material>("Materials/WhiteMaterial");
@@ -158,6 +164,8 @@ public class GameManager : Agent
         GameObject canvasContainer = GameObject.Find("Canvas");
         canvas = canvasContainer.GetComponent<Canvas>();
         canvasRt = (RectTransform)squarePrefab.transform;
+
+        bestPlayMoves = new List<int[,]>();
 
         CreateBoard();
         CreateNextBox();
@@ -175,14 +183,28 @@ public class GameManager : Agent
         nextBox = newSquare;
     }
 
-    private int GetHighestRank()
+    private int GetNumberOfEmptyCells()
     {
-        int highestRank = NextValueManager.GetRank(Board[0, 0]);
+        int nEmptyCells = 0;
         for (int y = 0; y < HEIGHT; y++)
         {
             for (int x = 0; x < WIDTH; x++)
             {
-                int curRank = NextValueManager.GetRank(Board[y, x]);
+                if (board[y, x] == 0)
+                    nEmptyCells++;
+            }
+        }
+        return nEmptyCells;        
+    }
+
+    private int GetHighestRank()
+    {
+        int highestRank = NextValueManager.GetRank(board[0, 0]);
+        for (int y = 0; y < HEIGHT; y++)
+        {
+            for (int x = 0; x < WIDTH; x++)
+            {
+                int curRank = NextValueManager.GetRank(board[y, x]);
                 if (curRank > highestRank)
                     highestRank = curRank;
             }
@@ -202,7 +224,7 @@ public class GameManager : Agent
         if (ret.Count > 1)
         {
             text.fontSize = 25;
-            rt.sizeDelta = new Vector2(nextBoxOrigialWidth*2, rt.rect.height);
+            rt.sizeDelta = new Vector2(nextBoxOrigialWidth * 2, rt.rect.height);
         }
         RenderNextCell(nextBox, ret);
         return ret;
@@ -210,7 +232,7 @@ public class GameManager : Agent
 
     void Update()
     {
-        Direction direction = Direction.Invalid;
+        Direction direction = Direction.DirectionsCount;
 
         if (gameOver)
             return;
@@ -232,7 +254,7 @@ public class GameManager : Agent
             direction = Direction.Up;
         }
 
-        if (direction != Direction.Invalid)
+        if (direction != Direction.DirectionsCount)
         {
             MakeMove(direction);
         }
@@ -240,7 +262,7 @@ public class GameManager : Agent
 
     public bool MakeMove(Direction direction)
     {
-        if (direction == Direction.Invalid)
+        if (direction == Direction.DirectionsCount)
             return false;
 
         int[] possibleMoves;
@@ -262,6 +284,8 @@ public class GameManager : Agent
             gameOverObj.SetActive(true);
         }
 
+        bestPlayMoves.Add((int[,])board.Clone());
+
         return true;
     }
 
@@ -272,7 +296,7 @@ public class GameManager : Agent
         {
             for (int x = 0; x < WIDTH; x++)
             {
-                int value = Board[y, x];
+                int value = board[y, x];
                 if (value < 3)
                     continue;
 
@@ -309,38 +333,38 @@ public class GameManager : Agent
         switch (direction)
         {
             case Direction.Up:
-                while (Board[HEIGHT - 1, random] != 0)
+                while (board[HEIGHT - 1, random] != 0)
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[HEIGHT - 1, random] = nextValue;
+                board[HEIGHT - 1, random] = nextValue;
                 break;
             case Direction.Down:
-                while (Board[0, random] != 0)
+                while (board[0, random] != 0)
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[0, random] = nextValue;
+                board[0, random] = nextValue;
                 break;
             case Direction.Left:
-                while (Board[random, WIDTH-1] != 0)
+                while (board[random, WIDTH - 1] != 0)
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[random, WIDTH - 1] = nextValue;
+                board[random, WIDTH - 1] = nextValue;
                 break;
             case Direction.Right:
-                while (Board[random, 0] != 0)
+                while (board[random, 0] != 0)
                 {
                     random = UnityEngine.Random.Range(0, WIDTH);
                 }
-                Board[random, 0] = nextValue;
+                board[random, 0] = nextValue;
                 break;
         }
         UpdateBoard();
     }
 
-    private void ApplyMove(Direction direction, int []offsets)
+    private void ApplyMove(Direction direction, int[] offsets)
     {
         switch (direction)
         {
@@ -371,7 +395,7 @@ public class GameManager : Agent
                 }
                 break;
             case Direction.Left:
-                for (int y=0; y<HEIGHT; y++)
+                for (int y = 0; y < HEIGHT; y++)
                 {
                     if (offsets[y] == IMPOSSIBLE_MOVE)
                     {
@@ -390,7 +414,7 @@ public class GameManager : Agent
                     {
                         continue;
                     }
-                    for (int x = offsets[y]; x >=0; x--)
+                    for (int x = offsets[y]; x >= 0; x--)
                     {
                         SetMoveResult(direction, x, y);
                     }
@@ -415,7 +439,7 @@ public class GameManager : Agent
                 break;
             case Direction.Left:
                 targetX = x - 1;
-                targetY = y;                     
+                targetY = y;
                 break;
             case Direction.Right:
                 targetX = x + 1;
@@ -429,41 +453,41 @@ public class GameManager : Agent
         {
             x = 1;
         }
-        int targetValue = Board[targetY, targetX];
-        int sourceValue = Board[y, x];
+        int targetValue = board[targetY, targetX];
+        int sourceValue = board[y, x];
         if (targetValue == 0)
         {
-            Board[targetY, targetX] = Board[y, x];
+            board[targetY, targetX] = board[y, x];
         }
         else
         {
             if ((targetValue == 1 && sourceValue == 2) ||
                 (targetValue == 2 && sourceValue == 1))
             {
-                Board[targetY, targetX] = 3;
+                board[targetY, targetX] = 3;
             }
             else
             {
                 if (targetValue == sourceValue)
                 {
-                    Board[targetY, targetX] = targetValue * 2;
+                    board[targetY, targetX] = targetValue * 2;
                 }
             }
         }
-        Board[y, x] = 0;
+        board[y, x] = 0;
     }
 
     private void FillInitialBoard()
     {
         int x, y;
-        for (int i=0; i<9; i++)
+        for (int i = 0; i < 9; i++)
         {
             do
             {
                 x = UnityEngine.Random.Range(0, WIDTH);
                 y = UnityEngine.Random.Range(0, HEIGHT);
-            } while (Board[y, x] != 0);
-            Board[y, x] = UnityEngine.Random.Range(1, 4);
+            } while (board[y, x] != 0);
+            board[y, x] = nextValueManager.numbers.GetNext();
         }
     }
 
@@ -474,7 +498,7 @@ public class GameManager : Agent
             for (int x = 0; x < WIDTH; x++)
             {
                 GameObject currCell = ObjectBoard[y, x];
-                int number = Board[y, x];
+                int number = board[y, x];
                 RenderCell(currCell, number);
             }
         }
@@ -493,11 +517,11 @@ public class GameManager : Agent
                 textObject.text = "";
                 break;
             case 1:
-                color = redColor;
+                color = blueColor;
                 textObject.color = Color.white;
                 break;
             case 2:
-                color = blueColor;
+                color = redColor;
                 textObject.color = Color.white;
                 break;
             default:
@@ -520,11 +544,11 @@ public class GameManager : Agent
         switch (nextValues[0])
         {
             case 1:
-                color = redColor;
+                color = blueColor; ;
                 textObject.color = Color.white;
                 break;
             case 2:
-                color = blueColor;
+                color = redColor;
                 textObject.color = Color.white;
                 break;
             default:
@@ -563,8 +587,8 @@ public class GameManager : Agent
 
     private bool CheckCellMove(int xFrom, int yFrom, int xTo, int yTo)
     {
-        int from = Board[yFrom, xFrom];
-        int to = Board[yTo, xTo];
+        int from = board[yFrom, xFrom];
+        int to = board[yTo, xTo];
 
         if (to == 0)
             return true;
@@ -591,7 +615,7 @@ public class GameManager : Agent
                 {
                     for (int y = 1; y < HEIGHT; y++)
                     {
-                        if (CheckCellMove(x, y, x, y-1))
+                        if (CheckCellMove(x, y, x, y - 1))
                         {
                             possibleMoves[x] = y;
                             break;
@@ -602,7 +626,7 @@ public class GameManager : Agent
             case Direction.Down:
                 for (int x = 0; x < WIDTH; x++)
                 {
-                    for (int y = HEIGHT-2; y >= 0; y--)
+                    for (int y = HEIGHT - 2; y >= 0; y--)
                     {
                         if (CheckCellMove(x, y, x, y + 1))
                         {
@@ -617,7 +641,7 @@ public class GameManager : Agent
                 {
                     for (int x = 1; x < WIDTH; x++)
                     {
-                        if (CheckCellMove(x, y, x-1, y))
+                        if (CheckCellMove(x, y, x - 1, y))
                         {
                             possibleMoves[y] = x;
                             break;
@@ -628,7 +652,7 @@ public class GameManager : Agent
             case Direction.Right:
                 for (int y = 0; y < HEIGHT; y++)
                 {
-                    for (int x = WIDTH-2; x >= 0; x--)
+                    for (int x = WIDTH - 2; x >= 0; x--)
                     {
                         if (CheckCellMove(x, y, x + 1, y))
                         {
@@ -642,7 +666,7 @@ public class GameManager : Agent
                 throw new Exception("");
         }
 
-        for (int i=0; i<WIDTH; i++)
+        for (int i = 0; i < WIDTH; i++)
         {
             if (possibleMoves[i] != IMPOSSIBLE_MOVE)
                 return true;
@@ -650,11 +674,24 @@ public class GameManager : Agent
         return false;
     }
 
-    static float step_reward = 0.004f;
+    static float step_reward = 0.003f;
     public override void OnEpisodeBegin()
     {
         Init();
-        step_reward = 0.004f;
+        step_reward = 0.003f;
+    }
+
+    private int NormalizeValue(int value)
+    {
+        switch (value)
+        {
+            case 0:
+            case 1:
+            case 2:
+                return value;
+            default:
+                return NextValueManager.GetRank(value) + 2;
+        }
     }
 
     public override void CollectObservations(VectorSensor sensor)
@@ -663,21 +700,35 @@ public class GameManager : Agent
         {
             for (int x = 0; x < WIDTH; x++)
             {
-                sensor.AddObservation(Board[y, x]);
+                int cellValue = board[y, x];
+                sensor.AddOneHotObservation(NormalizeValue(cellValue), 15);
             }
+        }
+
+        sensor.AddOneHotObservation(NormalizeValue(nextValues[0]), 15);
+        if (nextValues.Count > 1)
+        {
+            sensor.AddOneHotObservation(NormalizeValue(nextValues[1]), 15);
+            if (nextValues.Count > 2)
+            {
+                sensor.AddOneHotObservation(NormalizeValue(nextValues[2]), 15);
+            }
+            else
+            {
+                sensor.AddOneHotObservation(NormalizeValue(nextValues[1]), 15);
+            }
+        }
+        else
+        {
+            sensor.AddOneHotObservation(NormalizeValue(nextValues[0]), 15);
+            sensor.AddOneHotObservation(NormalizeValue(nextValues[0]), 15);
         }
     }
 
     public override void OnActionReceived(float[] vectorAction)
     {
-        //if (numMoves > 400)
-        //{
-        //    SetReward(-1.0f);
-        //    EndEpisode();
-        //    return;
-        //}
-
         int prevHighestRank = GetHighestRank();
+        int nEmptyCellsBeforeMove = GetNumberOfEmptyCells();
         Direction direction = (Direction)vectorAction[0];
         if (!MakeMove(direction))
         {
@@ -687,15 +738,35 @@ public class GameManager : Agent
             // on the next round before calling OnActionReceived.
             return;
         }
+
+        int nEmptyCellsAfterMove = GetNumberOfEmptyCells();
+        int emptyCellsDiff = nEmptyCellsAfterMove - nEmptyCellsBeforeMove;
+
+        if (emptyCellsDiff < -1)
+        {
+            AddReward(-0.002f);
+        }
+        else if (emptyCellsDiff == -1)
+        {
+            AddReward(-0.001f);
+        }
+        else if (emptyCellsDiff == 1)
+        {
+            AddReward(0.001f);
+        }
+        else if (emptyCellsDiff > 1)
+        {
+            AddReward(0.003f);
+        }
+
         if (GetHighestRank() > prevHighestRank)
         {
-            AddReward(0.15f);
+            AddReward(0.02f);
         }
 
         if (gameOver)
         {
-            SetReward(-1.0f);
-            EndEpisode();
+            MarkGameOver();
             return;
         }
 
@@ -707,7 +778,14 @@ public class GameManager : Agent
         }
 
         AddReward(step_reward);
-        step_reward += 0.001f;
+        step_reward += 0.00001f;
+    }
+
+    private void MarkGameOver()
+    {
+        lastReward = GetCumulativeReward();
+        SetReward(-1.0f);
+        EndEpisode();
     }
 
     public override void CollectDiscreteActionMasks(DiscreteActionMasker actionMasker)
@@ -715,11 +793,37 @@ public class GameManager : Agent
         List<int> impossibleMoves = new List<int>();
         int[] possibleMoves;
 
-        for (Direction i = Direction.Up; i < Direction.Invalid; i++)
+        for (Direction i = Direction.Up; i < Direction.DirectionsCount; i++)
         {
             if (!CheckMove(i, out possibleMoves))
                 impossibleMoves.Add((int)i);
         }
+
         actionMasker.SetMask(0, impossibleMoves);
+
+        if (impossibleMoves.Count == (int)Direction.DirectionsCount)
+            MarkGameOver();
+    }
+
+    private void DumpBestPlay()
+    {
+        String filename = @"c:\src\threes\best_play.txt";
+        File.WriteAllText(filename, "Score: " + this.score + ", Num Moves: " + this.numMoves + ", Reward: " +lastReward.ToString("0.00"));
+
+        int turn = 1;
+        foreach (int[,] play in this.bestPlayMoves)
+        {
+            File.AppendAllText(filename, "\nturn " + turn + "\n");
+            for (int y = 0; y < HEIGHT; y++)
+            {
+                String line = "";
+                for (int x = 0; x < WIDTH; x++)
+                {
+                    line += play[y, x] + ", ";
+                }
+                File.AppendAllText(filename, line + "\n");
+            }
+            turn++;
+        }
     }
 }

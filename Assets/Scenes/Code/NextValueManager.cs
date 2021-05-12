@@ -4,8 +4,7 @@ using UnityEngine;
 
 public class NextValueManager
 {
-
-	private PseudoList<int> numbers;
+	public PseudoList<int> numbers;
 	private PseudoList<int> special;
 	private PseudoList<int> random;
 
